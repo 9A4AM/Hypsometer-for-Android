@@ -1,0 +1,122 @@
+﻿Build1=Default,anywheresoftware.b4a.samples.hypsometer
+File1=Main.bal
+FileGroup1=Default Group
+Group=Default Group
+Library1=core
+Library2=phone
+ManifestCode='This code will be applied to the manifest file during compilation.~\n~'You do not need to modify it in most cases.~\n~'See this link for for more information: https://www.b4x.com/forum/showthread.php?p=78136~\n~AddManifestText(~\n~<uses-sdk android:minSdkVersion="5" android:targetSdkVersion="28"/>~\n~<supports-screens android:largeScreens="true" ~\n~    android:normalScreens="true" ~\n~    android:smallScreens="true" ~\n~    android:anyDensity="true"/>)~\n~SetApplicationAttribute(android:icon, "@drawable/icon")~\n~SetApplicationAttribute(android:label, "$LABEL$")~\n~CreateResourceFromFile(Macro, Themes.DarkTheme)~\n~AddPermission(android.permission.ACCESS_FINE_LOCATION)~\n~AddPermission(android.permission.ACCESS_COARSE_LOCATION)~\n~AddPermission(android.permission.BODY_SENSORS)~\n~~\n~'End of default text.~\n~
+NumberOfFiles=1
+NumberOfLibraries=2
+NumberOfModules=0
+Version=12.2
+@EndOfDesignText@
+#Region Module Attributes
+	#FullScreen: False
+	#IncludeTitle: True
+	#ApplicationLabel: Hypsometer_9A4AM
+	#VersionCode: 1
+	#VersionName: 
+	#SupportedOrientations: portrait
+	#CanInstallToExternalStorage: False
+#End Region
+
+Sub Process_Globals
+	' Konstantna vrijednost Pi
+	Private const Pi As Float = 3.1415927
+	' Globalne varijable
+	Dim sensor As PhoneSensors ' Senzor za akcelerometar
+	Dim pitch As Float ' Vrijednost nagiba iz akcelerometra
+	Dim thetaBase, thetaTop As Float ' Kutevi prema bazi i vrhu objekta
+	Dim distance, observerHeight As Float ' Udaljenost i visina promatrača
+End Sub
+
+Sub Globals
+	' UI komponente
+	Private btnMeasureBase As Button
+	Private btnMeasureTop As Button
+	Private txtDistance As EditText
+	Private txtObserverHeight As EditText
+	Private txtTopAngle As EditText ' Novi EditText za kut vrha objekta
+	Private btnCalculate As Button
+	Private lblObjectHeight As Label
+	Private lblDistance As Label
+	Private lblObserverHeight As Label
+	Private lblTopAngle As Label
+End Sub
+
+Sub Activity_Create(FirstTime As Boolean)
+	Activity.LoadLayout("Main")
+	' Postavi numeričku tipkovnicu za oba EditText polja
+	txtDistance.InputType = Bit.Or(txtDistance.InputType, 4096) ' InputType.TYPE_CLASS_NUMBER
+	txtObserverHeight.InputType = Bit.Or(txtObserverHeight.InputType, 4096) ' InputType.TYPE_CLASS_NUMBER
+	txtTopAngle.InputType = Bit.Or(txtTopAngle.InputType, Bit.Or(8192, 4096)) ' InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+	
+	' Inicijalizacija senzora
+	sensor.Initialize(sensor.TYPE_ACCELEROMETER)
+	thetaBase = 0 ' Postavi kut baze na 0 po defaultu
+End Sub
+
+Sub Activity_PermissionResult (Permission As String, Result As Boolean)
+	If Permission = "android.permission.BODY_SENSORS" Then
+		If Result = False Then
+			ToastMessageShow("Sensors permission DENIED! ", True)
+			Return
+		End If
+		' Pokreni aplikaciju ako je dozvola odobrena
+		sensor.Initialize(sensor.TYPE_ACCELEROMETER)
+	End If
+End Sub
+
+Sub btnMeasureBase_Click
+	sensor.StartListening("sensorChanged") ' Pokreni slušanje senzora
+	' Čekaj neko vrijeme kako bi se očitali podaci
+	Sleep(500)
+	thetaBase = pitch
+	ToastMessageShow("Angle to base of the object: " & NumberFormat(thetaBase, 1, 2) & "°", False)
+	sensor.StopListening ' Zaustavi slušanje senzora nakon mjerenja
+End Sub
+
+Sub btnMeasureTop_Click
+	sensor.StartListening("sensorChanged") ' Pokreni slušanje senzora
+	' Čekaj neko vrijeme kako bi se očitali podaci
+	Sleep(500)
+	thetaTop = pitch
+	ToastMessageShow("Angle to top of the object: " & NumberFormat(thetaTop, 1, 2) & "°", False)
+	sensor.StopListening ' Zaustavi slušanje senzora nakon mjerenja
+End Sub
+
+' Očitavanje podataka iz senzora
+Sub sensorChanged (Values() As Float)
+	' Pitch se uzima iz drugog elementa niza Values
+	pitch = Values(1) * 180 / Pi ' konvertiraj iz radijana u stupnjeve
+	Log("Pitch: " & pitch) ' Dodaj log da pratiš vrijednosti pitcha
+End Sub
+
+Sub btnCalculate_Click
+	' Provjera je li unesena udaljenost i visina promatrača
+	If txtDistance.Text = "" Or txtObserverHeight.Text = "" Then
+		ToastMessageShow("Enter the observer's distance and height", False)
+		Return
+	End If
+    
+	' Uzimanje vrijednosti iz tekstualnih polja
+	distance = txtDistance.Text
+	observerHeight = txtObserverHeight.Text
+	If txtTopAngle.Text <> "" Then
+		' Ako je unesena vrijednost za kut vrha, koristi tu vrijednost
+		thetaTop = txtTopAngle.Text
+	Else
+		' Ako nije unesena vrijednost, koristi prethodno izmjereni kut vrha
+		thetaTop = pitch
+	End If
+
+	' Pretvorba kutova iz stupnjeva u radijane za korištenje s trigonometrijskim funkcijama
+	Dim thetaBaseRad As Float = thetaBase * Pi / 180
+	Dim thetaTopRad As Float = thetaTop * Pi / 180
+
+	' Izračun visine objekta
+	Dim objectHeight As Float = distance * (Tan(thetaTopRad) - Tan(thetaBaseRad)) + observerHeight
+
+	' Prikaz rezultata
+	lblObjectHeight.Text = "Height of the object: " & NumberFormat(objectHeight, 1, 2) & " m"
+End Sub
